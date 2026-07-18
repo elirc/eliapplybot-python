@@ -1,0 +1,43 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #17202a;
+  background: #f6f7f9;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+header,
+section {
+  margin-bottom: 28px;
+}
+
+h1,
+h2 {
+  margin: 0 0 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th,
+td {
+  padding: 10px;
+  border-bottom: 1px solid #d9dee6;
+  text-align: left;
+  vertical-align: top;
+}
+
+code {
+  display: inline-block;
+  padding: 4px 6px;
+  background: #e9edf3;
+}
+

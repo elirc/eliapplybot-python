@@ -1,0 +1,83 @@
+{
+  "first_name": "Eli",
+  "last_name": "Example",
+  "email": "eli@example.com",
+  "phone": "555-123-4567",
+  "location": "Los Angeles, CA",
+  "address": "123 Local Street",
+  "city": "Los Angeles",
+  "state": "CA",
+  "country": "United States",
+  "linkedin_url": "https://www.linkedin.com/in/eli-example",
+  "github_url": "https://github.com/eli-example",
+  "portfolio_url": "https://eli.example.com",
+  "authorization": {
+    "legally_authorized_us": true,
+    "requires_sponsorship_now_or_future": false,
+    "authorized_countries": ["United States"],
+    "work_authorization_notes": "US work authorized."
+  },
+  "eeo": {
+    "gender": "Decline to answer",
+    "race_ethnicity": "Decline to answer",
+    "veteran_status": "Decline to answer",
+    "disability_status": "Decline to answer",
+    "decline_to_answer": true
+  },
+  "education": [
+    {
+      "school": "Example University",
+      "degree": "Bachelor of Science",
+      "field_of_study": "Computer Science",
+      "start_month": 9,
+      "start_year": 2018,
+      "end_month": 6,
+      "end_year": 2022,
+      "current": false,
+      "gpa": "3.8",
+      "location": "Los Angeles, CA"
+    }
+  ],
+  "experience": [
+    {
+      "company": "Example Co",
+      "title": "Software Engineer",
+      "location": "Remote",
+      "start_month": 7,
+      "start_year": 2022,
+      "end_month": null,
+      "end_year": null,
+      "current": true,
+      "description_bullets": ["Built Python and React applications."],
+      "technologies": ["Python", "React", "SQLite"]
+    }
+  ],
+  "skills": ["Python", "React", "Playwright", "FastAPI"],
+  "years_of_experience": {
+    "Python": 5,
+    "React": 4
+  },
+  "documents": {
+    "resume_path": "C:/Users/Owner/Desktop/Eli Rubin Resume.pdf",
+    "cover_letter_path": null,
+    "portfolio_files": []
+  },
+  "answer_bank": [
+    {
+      "id": "why-role",
+      "title": "Why this role",
+      "category": "motivation",
+      "tags": ["why", "role", "company"],
+      "answer": "I am excited by roles where I can build useful software with thoughtful teams.",
+      "last_updated": "2026-05-01"
+    }
+  ],
+  "preferences": {
+    "desired_roles": ["Software Engineer"],
+    "desired_locations": ["Los Angeles", "Remote"],
+    "remote_preference": "Remote or hybrid",
+    "salary_expectation": "$120,000+",
+    "earliest_start_date": "2026-06-01"
+  }
+}
+

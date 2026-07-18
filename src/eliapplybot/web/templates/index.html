@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eliapplybot</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>eliapplybot</h1>
+        <p>Local dashboard. Use the CLI to import profiles, run scans, and fill high-confidence fields.</p>
+      </header>
+      <section>
+        <h2>Database</h2>
+        <code>{{ db_path }}</code>
+      </section>
+      <section>
+        <h2>Jobs</h2>
+        {% if jobs %}
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Status</th><th>URL</th></tr>
+            </thead>
+            <tbody>
+              {% for job in jobs %}
+                <tr>
+                  <td>{{ job.id }}</td>
+                  <td>{{ job.status }}</td>
+                  <td>{{ job.url }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>No jobs added yet.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
+

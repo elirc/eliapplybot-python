@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Fake Local Job Application</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 860px; margin: 32px auto; line-height: 1.4; }
+      label { display: block; margin: 12px 0; }
+      input, select, textarea { display: block; width: 100%; padding: 8px; margin-top: 4px; }
+      fieldset { margin: 20px 0; }
+      button { padding: 10px 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>Example Software Engineer Application</h1>
+    <form id="application-form">
+      <section>
+        <h2>Contact</h2>
+        <label for="first-name">First name *</label>
+        <input id="first-name" name="first_name" autocomplete="given-name" required>
+
+        <label for="last-name">Last name *</label>
+        <input id="last-name" name="last_name" autocomplete="family-name" required>
+
+        <label for="email">Email address *</label>
+        <input id="email" type="email" name="email" autocomplete="email" required>
+
+        <label for="phone">Phone *</label>
+        <input id="phone" type="tel" name="phone" autocomplete="tel" required>
+
+        <label for="linkedin">LinkedIn profile</label>
+        <input id="linkedin" type="url" name="linkedin">
+
+        <label for="github">GitHub</label>
+        <input id="github" type="url" name="github">
+
+        <label for="location">Location *</label>
+        <input id="location" name="location" required>
+      </section>
+
+      <section>
+        <h2>Work Authorization</h2>
+        <label for="authorized">Are you legally authorized to work in the United States?</label>
+        <select id="authorized" name="authorized">
+          <option value="">Select one</option>
+          <option>Yes</option>
+          <option>No</option>
+        </select>
+
+        <label for="sponsorship">Will you now or in the future require visa sponsorship?</label>
+        <select id="sponsorship" name="sponsorship">
+          <option value="">Select one</option>
+          <option>Yes</option>
+          <option>No</option>
+        </select>
+      </section>
+
+      <section>
+        <h2>Education</h2>
+        <label for="school">School / University</label>
+        <input id="school" name="education_school">
+
+        <label for="degree">Degree</label>
+        <input id="degree" name="degree">
+
+        <label for="field-study">Field of study</label>
+        <input id="field-study" name="field_of_study">
+      </section>
+
+      <section>
+        <h2>Experience</h2>
+        <label for="company">Company / Employer</label>
+        <input id="company" name="company">
+
+        <label for="title">Position title</label>
+        <input id="title" name="title">
+
+        <label for="python-years">Years of Python experience</label>
+        <input id="python-years" type="number" name="python_years">
+
+        <label for="react-years">Years of React experience</label>
+        <input id="react-years" type="number" name="react_years">
+      </section>
+
+      <section>
+        <h2>EEO</h2>
+        <label for="gender">Gender</label>
+        <select id="gender" name="gender">
+          <option value="">Select one</option>
+          <option>Decline to answer</option>
+          <option>Woman</option>
+          <option>Man</option>
+          <option>Non-binary</option>
+        </select>
+
+        <label for="veteran">Veteran status</label>
+        <select id="veteran" name="veteran">
+          <option value="">Select one</option>
+          <option>Decline to answer</option>
+          <option>I am not a protected veteran</option>
+          <option>I identify as one or more classifications of protected veteran</option>
+        </select>
+      </section>
+
+      <fieldset>
+        <legend>Will you now or in the future require visa sponsorship?</legend>
+        <label><input type="radio" name="sponsorship_radio" value="yes"> Yes</label>
+        <label><input type="radio" name="sponsorship_radio" value="no"> No</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Preferred work setting</legend>
+        <label><input type="radio" name="work_setting" value="remote"> Remote</label>
+        <label><input type="radio" name="work_setting" value="hybrid"> Hybrid</label>
+        <label><input type="radio" name="work_setting" value="onsite"> On-site</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Skills you want us to know about</legend>
+        <label><input type="checkbox" name="skills" value="python"> Python</label>
+        <label><input type="checkbox" name="skills" value="react"> React</label>
+        <label><input type="checkbox" name="skills" value="sql"> SQL</label>
+      </fieldset>
+
+      <section>
+        <h2>Documents and Questions</h2>
+        <label for="resume">Resume upload</label>
+        <input id="resume" type="file" name="resume">
+
+        <label for="cover-letter">Cover letter</label>
+        <textarea id="cover-letter" name="cover_letter"></textarea>
+
+        <label for="why-role">Why do you want this role at our company?</label>
+        <textarea id="why-role" name="why_role"></textarea>
+      </section>
+
+      <button type="submit" id="submit-application">Submit application</button>
+    </form>
+    <script>
+      document.querySelector("form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        document.body.dataset.submitted = "true";
+      });
+    </script>
+  </body>
+</html>
+
