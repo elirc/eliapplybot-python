@@ -16,6 +16,22 @@ SKIP_UPLOAD_PATTERNS = re.compile(
 LONG_ANSWER_PATTERNS = re.compile(
     r"\b(why|tell us|describe|story|project|essay|cover letter|additional information)\b", re.I
 )
+DECLINE_PATTERNS = re.compile(
+    r"\b(decline|prefer not|don t wish|do not wish|dont wish|rather not|choose not|"
+    r"not to answer|not to disclose|not to self identify|not to say|no answer)\b",
+    re.I,
+)
+CUSTOM_WIDGETS = {"combobox", "listbox"}
+
+# Labels that contain a personal keyword but usually mean a different sub-field.
+AMBIGUOUS_PERSONAL: dict[str, re.Pattern[str]] = {
+    "address": re.compile(r"\b(line 2|line2|apt|apartment|suite|unit|street 2|address 2)\b"),
+    "phone": re.compile(r"\b(type|extension|ext|country code|device|code)\b"),
+    "country": re.compile(r"\b(code|dial|prefix)\b"),
+    "location": re.compile(r"\b(preferred|office|desired|which|willing|relocate)\b"),
+    "state": re.compile(r"\b(issuing|license|licence)\b"),
+    "full_name": re.compile(r"\b(company|employer|school|university|referr|contact|reference)\b"),
+}
 
 
 def normalize_text(value: str | None) -> str:
@@ -183,11 +199,15 @@ def match_personal(
     ]
     haystack = label if label else text
     for pattern, key, getter, name in rules:
-        if pattern.search(haystack):
-            value = getter()
-            if value:
-                return high(key, value, f"Matched clear {name} label.")
-            return medium(key, f"Matched {name}, but profile value is empty.")
+        if not pattern.search(haystack):
+            continue
+        ambiguous = AMBIGUOUS_PERSONAL.get(key)
+        if ambiguous and ambiguous.search(haystack):
+            return medium(key, f"Matched {name}, but the label looks like a related sub-field.")
+        value = getter()
+        if value:
+            return high(key, value, f"Matched clear {name} label.")
+        return medium(key, f"Matched {name}, but profile value is empty.")
     return None
 
 
@@ -199,7 +219,11 @@ def match_authorization(
     for haystack in dict.fromkeys([label, text]):
         if not haystack:
             continue
-        if re.search(r"\b(legally authorized|authorized to work|eligible to work)\b", haystack):
+        if re.search(
+            r"\b(legally authorized|authorized to work|authorised to work|eligible to work|"
+            r"right to work|legally eligible|work authorization)\b",
+            haystack,
+        ):
             value = "Yes" if profile.authorization.legally_authorized_us else "No"
             return yes_no_match(
                 field, "authorization.legally_authorized_us", value, "work authorization"
@@ -220,7 +244,8 @@ def match_authorization(
 def match_eeo(
     field: DetectedField, profile: CandidateProfile, text: str, label: str
 ) -> dict[str, object] | None:
-    if not field.options:
+    is_widget = field.element_type in CUSTOM_WIDGETS
+    if not field.options and not is_widget:
         return None
     haystack = label if label else text
     checks = [
@@ -242,10 +267,22 @@ def match_eeo(
         ),
     ]
     for pattern, key, value in checks:
-        if pattern.search(haystack):
-            if value and option_matches(field, value):
-                return high(key, value, "Matched EEO field with exact available option.")
-            return medium(key, "EEO field found, but saved value does not exactly match options.")
+        if not pattern.search(haystack):
+            continue
+        if not value:
+            return medium(key, "EEO field found, but no value is saved in the profile.")
+        if is_widget and not field.options:
+            if is_decline(value):
+                return high(
+                    key,
+                    value,
+                    "EEO custom dropdown; filled only if exactly one decline-style option exists.",
+                )
+            return medium(key, "EEO custom dropdown; options are unknown until opened. Review.")
+        resolved = resolve_option(field, value)
+        if resolved:
+            return high(key, resolved, "Matched EEO field with exact available option.")
+        return medium(key, "EEO field found, but saved value does not exactly match options.")
     return None
 
 
@@ -339,14 +376,30 @@ def match_experience(
 
 
 def match_preferences(
-    _field: DetectedField, profile: CandidateProfile, text: str, _label: str
+    _field: DetectedField, profile: CandidateProfile, text: str, label: str
 ) -> dict[str, object] | None:
+    haystack = label if label else text
+    if re.search(
+        r"\b(remote|hybrid|on site|onsite|in office|work setting|work arrangement)\b", haystack
+    ):
+        if profile.preferences.remote_preference:
+            return {
+                "mapped_profile_key": "preferences.remote_preference",
+                "confidence": Confidence.MEDIUM,
+                "value": profile.preferences.remote_preference,
+                "reason": "Work-setting preference found; choose the matching option manually.",
+            }
+        return medium(
+            "preferences.remote_preference", "Work-setting question found; no preference saved."
+        )
     if re.search(r"\b(salary|compensation|pay expectation)\b", text):
         if profile.preferences.salary_expectation:
-            return medium(
-                "preferences.salary_expectation",
-                "Salary expectation is configured but requires review before filling.",
-            )
+            return {
+                "mapped_profile_key": "preferences.salary_expectation",
+                "confidence": Confidence.MEDIUM,
+                "value": profile.preferences.salary_expectation,
+                "reason": "Salary expectation is configured but requires review before filling.",
+            }
         return medium("preferences.salary_expectation", "Salary field found; no configured value.")
     return None
 
@@ -375,8 +428,28 @@ def yes_no_match(field: DetectedField, key: str, value: str, label: str) -> dict
 
 
 def option_matches(field: DetectedField, value: str) -> bool:
+    return resolve_option(field, value) is not None
+
+
+def resolve_option(field: DetectedField, value: str) -> str | None:
+    """Return the option text to select for ``value``, or None if no safe match exists.
+
+    Exact (normalized) matches win. A decline-style profile value also matches
+    when exactly one option is decline-style, since the intent is identical.
+    """
     normalized = normalize_text(value)
-    return any(normalize_text(option) == normalized for option in field.options)
+    for option in field.options:
+        if normalize_text(option) == normalized:
+            return option
+    if is_decline(value):
+        declines = [option for option in field.options if is_decline(option)]
+        if len(declines) == 1:
+            return declines[0]
+    return None
+
+
+def is_decline(value: str | None) -> bool:
+    return bool(value) and bool(DECLINE_PATTERNS.search(normalize_text(value)))
 
 
 def stable_key(field: DetectedField) -> str:

@@ -191,3 +191,78 @@ def test_eeo_exact_option_matching():
     )
     assert gender.confidence == Confidence.HIGH
     assert gender.value == "Decline to answer"
+
+
+def test_decline_synonym_matches_single_decline_option():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    veteran = match_field(
+        field(
+            "Veteran status",
+            element_type="select",
+            options=[
+                "I am not a protected veteran",
+                "I identify as a protected veteran",
+                "I don't wish to answer",
+            ],
+        ),
+        profile,
+    )
+    assert veteran.confidence == Confidence.HIGH
+    assert veteran.value == "I don't wish to answer"
+
+
+def test_eeo_combobox_without_options_is_high_only_for_decline():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    gender = match_field(field("Gender", element_type="combobox", input_type="combobox"), profile)
+    assert gender.confidence == Confidence.HIGH
+    assert gender.value == "Decline to answer"
+
+    profile_active = profile.model_copy(deep=True)
+    profile_active.eeo.gender = "Woman"
+    gender_active = match_field(
+        field("Gender", element_type="combobox", input_type="combobox"), profile_active
+    )
+    assert gender_active.confidence == Confidence.MEDIUM
+
+
+def test_ambiguous_personal_labels_stay_medium():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    line2 = match_field(field("Address line 2"), profile)
+    assert line2.confidence == Confidence.MEDIUM
+
+    phone_type = match_field(
+        field("Phone type", element_type="select", options=["Home", "Mobile"]), profile
+    )
+    assert phone_type.confidence == Confidence.MEDIUM
+
+    country_code = match_field(field("Country code"), profile)
+    assert country_code.confidence == Confidence.MEDIUM
+
+    preferred_location = match_field(field("Preferred work location"), profile)
+    assert preferred_location.confidence != Confidence.HIGH
+
+
+def test_right_to_work_phrasing_matches_authorization():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    match = match_field(
+        field("Do you have the right to work in the United States?", options=["Yes", "No"]),
+        profile,
+    )
+    assert match.mapped_profile_key == "authorization.legally_authorized_us"
+    assert match.value == "Yes"
+
+
+def test_remote_preference_is_suggested_not_filled():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    match = match_field(
+        field(
+            "Preferred work setting",
+            element_type="radio",
+            input_type="radio",
+            options=["Remote", "Hybrid", "On-site"],
+        ),
+        profile,
+    )
+    assert match.mapped_profile_key == "preferences.remote_preference"
+    assert match.confidence == Confidence.MEDIUM
+    assert match.value == "Remote or hybrid"

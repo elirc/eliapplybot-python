@@ -17,7 +17,7 @@ This app opens job application pages in a Playwright-controlled Chromium browser
 ## Setup
 
 ```powershell
-cd "C:\Users\Owner\Desktop\_Organized Desktop\08 App And Product Projects\eliapplybot-python"
+cd <path-to>\eliapplybot-python
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
@@ -26,23 +26,49 @@ python -m playwright install chromium
 
 Any Python 3.11+ executable works.
 
-## Initialize and import the sample profile
+## Create your profile
 
 ```powershell
-eliapplybot init-db
-eliapplybot import-profile tests\fixtures\sample_profile.json
-eliapplybot export-profile output\profile.json
+eliapplybot new-profile output\my-profile.json
+# edit output\my-profile.json with your real details, then:
+eliapplybot import-profile output\my-profile.json
 ```
 
-Edit the exported JSON or create your own profile JSON before using real personal data.
+`new-profile` writes a placeholder template; every value in it must be replaced
+with your own information before real use. `import-profile` validates the JSON
+and warns if `documents.resume_path` or `cover_letter_path` do not exist on
+this machine. `export-profile output\profile.json` writes the stored profile
+back out for editing; re-import after editing.
 
-## Run against the fake local application page
+## Try it against the fake local application page first
 
-Use a `file:///` URL for the included fixture:
+Use a `file:///` URL for the included fixture (adjust the path to where this
+repo lives):
 
 ```powershell
-eliapplybot run "file:///C:/Users/Owner/Desktop/_Organized%20Desktop/08%20App%20And%20Product%20Projects/eliapplybot-python/tests/fixtures/fake_application.html" --report reports\fake-run.json
+eliapplybot run "file:///<path-to>/eliapplybot-python/tests/fixtures/fake_application.html" --report reports\fake-run.json
 ```
+
+Add `--headless --no-input --close-browser` to run it fully unattended against
+the fixture. Do not use `--no-input` on real job pages; the prompt is what
+gives you time to log in and get the form on screen before scanning.
+
+## Real use
+
+```powershell
+eliapplybot run "https://boards.greenhouse.io/<company>/jobs/<id>" --report reports\job.json
+```
+
+1. Chromium opens with a persistent local browser profile (logins are remembered
+   between runs).
+2. Log in or navigate manually until the application form is on screen.
+3. Press Enter in the terminal; the app scans and fills only high-confidence
+   fields, verifying each value after filling.
+4. Custom dropdowns (Greenhouse/Lever-style comboboxes) are opened and an
+   option is clicked only when it matches your saved answer exactly (or is the
+   single "decline to answer"-style option when your saved EEO answer declines).
+5. Review the terminal/JSON report, complete the uncertain and skipped fields,
+   upload your resume yourself, and submit only when you decide to.
 
 Workflow:
 
@@ -58,7 +84,8 @@ Workflow:
 
 ```powershell
 eliapplybot init-db
-eliapplybot import-profile tests\fixtures\sample_profile.json
+eliapplybot new-profile output\my-profile.json
+eliapplybot import-profile output\my-profile.json
 eliapplybot export-profile output\profile.json
 eliapplybot add-job "https://example.com/job"
 eliapplybot list-jobs
@@ -67,7 +94,7 @@ eliapplybot run "https://example.com/job"
 eliapplybot show-attempt 1
 ```
 
-`scan` opens the page and produces review entries without filling fields. `run` fills only high-confidence fields. Both accept `--headless` (mainly for testing against local fixture pages) and `--report <path>` for a JSON report.
+`scan` opens the page and produces review entries without filling fields. `run` fills only high-confidence fields. Both accept `--headless` and `--no-input` (mainly for testing against local fixture pages) and `--report <path>` for a JSON report.
 
 ## Optional local dashboard
 
@@ -87,7 +114,10 @@ ruff check .
 ruff format .
 ```
 
-The current tests are unit-level and storage-level. Browser integration tests are documented in `ROADMAP.md`.
+Tests cover the matcher and storage at unit level plus headless-Chromium
+integration tests (`tests/test_browser.py`) that scan and fill the local
+fixtures, including custom combobox widgets, and assert that submit is never
+clicked. The browser tests skip automatically if Chromium is not installed.
 
 ## Project structure
 

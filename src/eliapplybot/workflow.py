@@ -22,6 +22,7 @@ def run_application(
     review_only: bool = False,
     keep_browser_open: bool = True,
     report_path: str | Path | None = None,
+    interactive: bool = True,
 ) -> dict[str, object]:
     storage.init_db()
     profile = storage.load_profile(profile_name)
@@ -33,9 +34,10 @@ def run_application(
     with BrowserController(config) as browser:
         page = browser.open_page(url)
         adapter.wait_ready(page)
-        print("")
-        print("Browser opened. Log in or navigate manually if needed.")
-        input("Press Enter here when the application form is visible and ready to scan...")
+        if interactive:
+            print("")
+            print("Browser opened. Log in or navigate manually if needed.")
+            input("Press Enter here when the application form is visible and ready to scan...")
 
         fields = [adapter.normalize_field(field) for field in scan_page(page)]
         storage.save_detections(attempt_id, fields)
@@ -71,9 +73,9 @@ def run_application(
         print(f"Attempt id: {attempt_id}")
         print("No final submit/apply/send button was clicked.")
 
-        if keep_browser_open:
+        if keep_browser_open and interactive:
             input("Review the page manually. Press Enter to close the Playwright browser...")
-        else:
+        elif not keep_browser_open:
             clear_filled(page, results)
 
     storage.update_attempt_status(attempt_id, "reviewed", finished=True)
@@ -87,6 +89,7 @@ def scan_application(
     storage: Storage,
     profile_name: str = "default",
     report_path: str | Path | None = None,
+    interactive: bool = True,
 ) -> dict[str, object]:
     return run_application(
         url,
@@ -96,4 +99,5 @@ def scan_application(
         review_only=True,
         keep_browser_open=True,
         report_path=report_path,
+        interactive=interactive,
     )

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Fake Custom Widget Application</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 720px; margin: 32px auto; }
+      .field { margin: 16px 0; }
+      .combo { position: relative; }
+      .combo input { width: 100%; padding: 8px; }
+      .menu { border: 1px solid #999; position: absolute; background: #fff; width: 100%; display: none; z-index: 10; }
+      .menu[data-open="true"] { display: block; }
+      .menu div[role="option"] { padding: 6px; cursor: pointer; }
+      .menu div[role="option"]:hover { background: #eef; }
+    </style>
+  </head>
+  <body>
+    <h1>Custom Widget Application</h1>
+    <form>
+      <div class="field">
+        <label for="cw-email">Email</label>
+        <input id="cw-email" name="email" type="email">
+      </div>
+
+      <div class="field combo" data-options="Yes,No">
+        <label for="cw-authorized">Are you legally authorized to work in the United States?</label>
+        <input id="cw-authorized" name="authorized_combo" role="combobox" readonly
+               aria-expanded="false" aria-haspopup="listbox" placeholder="Select...">
+        <div class="menu" role="listbox"></div>
+      </div>
+
+      <div class="field combo"
+           data-options="Male,Female,Decline To Self Identify">
+        <label for="cw-gender">Gender</label>
+        <input id="cw-gender" name="gender_combo" role="combobox" readonly
+               aria-expanded="false" aria-haspopup="listbox" placeholder="Select...">
+        <div class="menu" role="listbox"></div>
+      </div>
+
+      <div class="field" role="radiogroup" aria-labelledby="sponsor-label">
+        <div id="sponsor-label">Will you now or in the future require visa sponsorship?</div>
+        <label><input type="radio" name="sponsor_radio" value="yes"> Yes</label>
+        <label><input type="radio" name="sponsor_radio" value="no"> No</label>
+      </div>
+
+      <button type="submit" id="cw-submit">Submit application</button>
+    </form>
+    <script>
+      document.querySelectorAll(".combo").forEach((combo) => {
+        const input = combo.querySelector("input");
+        const menu = combo.querySelector(".menu");
+        const getOptions = () => combo.dataset.options.split(",");
+        const close = () => {
+          menu.dataset.open = "false";
+          menu.innerHTML = "";
+          input.setAttribute("aria-expanded", "false");
+        };
+        input.addEventListener("click", () => {
+          menu.dataset.open = "true";
+          input.setAttribute("aria-expanded", "true");
+          menu.innerHTML = "";
+          getOptions().forEach((text) => {
+            const option = document.createElement("div");
+            option.setAttribute("role", "option");
+            option.textContent = text;
+            option.addEventListener("click", () => {
+              input.value = text;
+              close();
+            });
+            menu.appendChild(option);
+          });
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") close();
+        });
+      });
+      document.querySelector("form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        document.body.dataset.submitted = "true";
+      });
+    </script>
+  </body>
+</html>

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from contextlib import suppress
+
 from playwright.sync_api import Page
 
+from eliapplybot.matcher import is_decline, normalize_text
 from eliapplybot.models import Confidence, FieldMatch, FillAction, FillResult
 from eliapplybot.review import mask_value
 
@@ -52,13 +55,7 @@ def fill_one(page: Page, match: FieldMatch) -> FillResult:
                     match, old_value, "No exact radio/checkbox option matched the profile value."
                 )
         elif field.element_type in {"combobox", "listbox"}:
-            return FillResult(
-                match=match,
-                action=FillAction.UNCERTAIN,
-                value_preview=value,
-                old_value=old_value,
-                reason="Custom ARIA widget detected; review and fill manually in this first build.",
-            )
+            return fill_combobox(frame, locator, match, old_value)
         elif (field.input_type or "").lower() in {"file", "submit", "button", "reset", "image"}:
             return FillResult(
                 match=match,
@@ -69,6 +66,13 @@ def fill_one(page: Page, match: FieldMatch) -> FillResult:
             )
         else:
             locator.fill(value, timeout=5000)
+            actual = read_back(locator)
+            if actual is not None and normalize_text(actual) != normalize_text(value):
+                return failed(
+                    match,
+                    old_value,
+                    f"Verification failed: field shows {actual!r} after filling.",
+                )
         return FillResult(
             match=match,
             action=FillAction.FILLED,
@@ -80,12 +84,91 @@ def fill_one(page: Page, match: FieldMatch) -> FillResult:
         return failed(match, old_value, f"Playwright fill failed: {exc}")
 
 
+def read_back(locator) -> str | None:
+    try:
+        return locator.input_value(timeout=2000)
+    except Exception:
+        return None
+
+
+def fill_combobox(frame, locator, match: FieldMatch, old_value: str | None) -> FillResult:
+    """Fill a custom ARIA combobox by opening it and clicking an exact option.
+
+    Safety rules:
+    - Only exact (normalized) option-text matches are clicked, plus a single
+      decline-style option when the profile value is itself decline-style.
+    - If no safe option is found, the widget is closed with Escape and the
+      field is reported as uncertain for manual review.
+    """
+    value = match.value or ""
+    uncertain_reason = (
+        "Custom dropdown: no option exactly matched the saved value; review and pick manually."
+    )
+    try:
+        locator.click(timeout=4000)
+        options = frame.locator("[role='option']")
+        try:
+            options.first.wait_for(state="visible", timeout=3000)
+        except Exception:
+            frame.page.keyboard.press("Escape")
+            return uncertain(match, old_value, "Custom dropdown did not show options when opened.")
+        texts = options.all_inner_texts()
+        target_index = pick_option_index(texts, value)
+        if target_index is None:
+            frame.page.keyboard.press("Escape")
+            return uncertain(match, old_value, uncertain_reason)
+        chosen = texts[target_index].strip()
+        option = options.nth(target_index)
+        try:
+            option.click(timeout=3000)
+        except Exception:
+            # Overlapping layout can block Playwright's actionability check even
+            # though the option is the real, visible target we just read. The
+            # option text was verified above, so a direct DOM click is safe.
+            option.evaluate("el => el.click()")
+        return FillResult(
+            match=match,
+            action=FillAction.FILLED,
+            value_preview=chosen,
+            old_value=old_value,
+            reason=f"Selected exact custom-dropdown option: {chosen}.",
+        )
+    except Exception as exc:
+        with suppress(Exception):
+            frame.page.keyboard.press("Escape")
+        return uncertain(match, old_value, f"Custom dropdown could not be filled safely: {exc}")
+
+
+def pick_option_index(texts: list[str], value: str) -> int | None:
+    normalized = normalize_text(value)
+    for index, text in enumerate(texts):
+        if normalize_text(text) == normalized:
+            return index
+    if is_decline(value):
+        declines = [index for index, text in enumerate(texts) if is_decline(text)]
+        if len(declines) == 1:
+            return declines[0]
+    return None
+
+
+def uncertain(match: FieldMatch, old_value: str | None, reason: str) -> FillResult:
+    return FillResult(
+        match=match,
+        action=FillAction.UNCERTAIN,
+        value_preview=match.value,
+        old_value=old_value,
+        reason=reason,
+    )
+
+
 def clear_filled(page: Page, results: list[FillResult]) -> int:
     cleared = 0
     for result in reversed(results):
         if result.action != FillAction.FILLED:
             continue
         field = result.match.field
+        if field.element_type in {"combobox", "listbox"}:
+            continue
         try:
             frame = page.frames[field.frame_index]
             locator = frame.locator(field.selector).first

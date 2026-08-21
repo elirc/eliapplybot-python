@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from eliapplybot.config import AppConfig
-from eliapplybot.profile_io import load_profile, save_profile
+from eliapplybot.profile_io import load_profile, profile_template, save_profile
 from eliapplybot.storage import Storage
 from eliapplybot.workflow import run_application, scan_application
 
@@ -17,6 +17,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init-db")
+
+    new_profile = sub.add_parser(
+        "new-profile", help="Write a profile template JSON to edit with your real details."
+    )
+    new_profile.add_argument("path")
 
     import_profile = sub.add_parser("import-profile")
     import_profile.add_argument("path")
@@ -42,12 +47,18 @@ def main() -> None:
     run.add_argument("--report")
     run.add_argument("--close-browser", action="store_true")
     run.add_argument("--headless", action="store_true")
+    run.add_argument(
+        "--no-input",
+        action="store_true",
+        help="Skip the interactive prompts (for testing against local fixture pages).",
+    )
 
     scan = sub.add_parser("scan")
     scan.add_argument("url")
     scan.add_argument("--profile", default="default")
     scan.add_argument("--report")
     scan.add_argument("--headless", action="store_true")
+    scan.add_argument("--no-input", action="store_true")
 
     args = parser.parse_args()
     config = AppConfig.from_env()
@@ -56,13 +67,26 @@ def main() -> None:
     if getattr(args, "headless", False):
         config = dataclasses.replace(config, headless=True)
     storage = Storage(config.db_path)
+    storage.init_db()
 
     if args.command == "init-db":
-        storage.init_db()
         print(f"Initialized database at {config.db_path}")
+    elif args.command == "new-profile":
+        target = Path(args.path)
+        if target.exists():
+            raise SystemExit(f"Refusing to overwrite existing file: {target}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(profile_template(), encoding="utf-8")
+        print(f"Wrote profile template to {target}")
+        print("Edit it with your real details, then run: eliapplybot import-profile " + str(target))
     elif args.command == "import-profile":
-        storage.init_db()
         profile = load_profile(args.path)
+        resume = profile.documents.resume_path
+        if resume and not Path(resume).exists():
+            print(f"Warning: resume_path does not exist on this machine: {resume}")
+        cover = profile.documents.cover_letter_path
+        if cover and not Path(cover).exists():
+            print(f"Warning: cover_letter_path does not exist on this machine: {cover}")
         profile_id = storage.save_profile(profile, name=args.name)
         print(f"Imported profile {args.name!r} as id {profile_id}")
     elif args.command == "export-profile":
@@ -70,11 +94,9 @@ def main() -> None:
         save_profile(profile, args.path)
         print(f"Exported profile {args.name!r} to {args.path}")
     elif args.command == "add-job":
-        storage.init_db()
         job_id = storage.add_job(args.url, title=args.title, company=args.company)
         print(f"Job id {job_id}: {args.url}")
     elif args.command == "list-jobs":
-        storage.init_db()
         for job in storage.list_jobs():
             print(f"{job.id}\t{job.status}\t{job.url}")
     elif args.command == "show-attempt":
@@ -88,6 +110,7 @@ def main() -> None:
             profile_name=args.profile,
             keep_browser_open=not args.close_browser,
             report_path=args.report,
+            interactive=not args.no_input,
         )
     elif args.command == "scan":
         scan_application(
@@ -96,4 +119,5 @@ def main() -> None:
             storage=storage,
             profile_name=args.profile,
             report_path=args.report,
+            interactive=not args.no_input,
         )

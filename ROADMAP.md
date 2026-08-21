@@ -2,12 +2,25 @@
 
 This first build demonstrates the full local architecture, but it is intentionally conservative.
 
+## Done since the first build
+
+- Playwright browser integration tests for the fake application and custom
+  widget fixtures (`tests/test_browser.py`).
+- First-pass ARIA combobox/listbox support: the filler opens the widget and
+  clicks only an exact (or single decline-style) option, else leaves it for
+  review.
+- Radio/checkbox group labels from `role="radiogroup"`/`aria-labelledby` and
+  nearby question text when there is no `<fieldset>`.
+- Post-fill verification: text inputs are read back after filling and reported
+  as failed if the page shows a different value.
+- `new-profile` template command, `--no-input` automation flag, and
+  resume/cover-letter path existence warnings on import.
+
 ## Next practical improvements
 
-- Add Playwright browser integration tests for the fake application fixture.
 - Improve same-origin iframe selector stability and cross-frame reporting.
 - Add richer adapter-specific scanner hints for Greenhouse, Lever, Ashby, and Workday.
-- Add robust custom widget support for ARIA comboboxes/listboxes and Workday-style controls.
+- Extend custom widget support to Workday-style multi-step controls.
 - Add an explicit review UI where each medium-confidence suggestion can be approved before filling.
 - Add resume upload approval flow with file existence checks and clear confirmation.
 - Add answer-bank search/edit UI and manual “fill this answer” controls.
@@ -26,5 +39,5 @@ This first build demonstrates the full local architecture, but it is intentional
 - The first build does not click next/continue/final submit buttons.
 - Long-form answers are only suggested; they are not silently filled.
 - The local web dashboard is read-oriented; the CLI is the main workflow.
-- Browser tests are not enabled by default because Playwright installation can be heavy.
+- Browser tests skip automatically when Chromium is not installed.
 

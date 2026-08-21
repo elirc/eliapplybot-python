@@ -89,6 +89,33 @@ SCAN_SCRIPT = r"""
       || /\*\s*$/.test(nearby);
   };
   const optionLabel = (input) => norm(explicitLabel(input) || input.value);
+  const groupLabel = (input, members) => {
+    const fieldset = input.closest("fieldset");
+    const legend = fieldset ? fieldset.querySelector("legend") : null;
+    if (legend) return norm(legend.innerText || legend.textContent || "");
+    const group = input.closest("[role='radiogroup'],[role='group']");
+    if (group) {
+      const aria = group.getAttribute("aria-label")
+        || textByIdRefs(group.getAttribute("aria-labelledby"));
+      if (aria) return norm(aria);
+    }
+    const optionTexts = new Set(members.map(optionLabel));
+    const ownLabels = new Set(members.map((m) => m.closest("label")).filter(Boolean));
+    let container = input.parentElement;
+    for (let depth = 0; container && depth < 6; depth += 1) {
+      const candidates = Array.from(container.querySelectorAll(
+        "legend,label,[class*='label' i],[class*='question' i],[class*='title' i],p,span,div"
+      ));
+      for (const node of candidates) {
+        if (ownLabels.has(node) || node.querySelector("input")) continue;
+        if (node.closest("label") && ownLabels.has(node.closest("label"))) continue;
+        const text = norm(node.innerText || node.textContent || "");
+        if (text && text.length <= 200 && !optionTexts.has(text)) return text;
+      }
+      container = container.parentElement;
+    }
+    return "";
+  };
   const add = (el, extra) => {
     if (!visible(el)) return;
     const label = extra.label_override || bestLabel(el);
@@ -134,11 +161,10 @@ SCAN_SCRIPT = r"""
       ].join("|");
       return candidateKey === key && visible(candidate);
     });
-    const legend = fieldset ? fieldset.querySelector("legend") : null;
     add(input, {
       element_type: input.type === "radio" ? "radio" : "checkbox",
       input_type: input.type,
-      label_override: legend ? norm(legend.innerText || legend.textContent || "") : "",
+      label_override: groupLabel(input, members),
       selector: input.name
         ? `input[type="${input.type}"][name="${esc(input.name)}"]`
         : cssPath(input),
@@ -151,6 +177,7 @@ SCAN_SCRIPT = r"""
   for (const el of Array.from(document.querySelectorAll("input, textarea, select"))) {
     if (!visible(el)) continue;
     if (el.matches("input[type='radio'],input[type='checkbox'],input[type='hidden']")) continue;
+    if (el.getAttribute("role") === "combobox" || el.closest("[role='combobox']")) continue;
     if (el.tagName.toLowerCase() === "select") {
       add(el, {
         element_type: "select",
@@ -168,21 +195,35 @@ SCAN_SCRIPT = r"""
     "button,input[type='submit'],input[type='button'],input[type='reset']"
   ))) {
     if (!visible(el)) continue;
+    const buttonText = norm(el.innerText || el.value || el.textContent || "");
     add(el, {
       element_type: "button",
       input_type: el.type || "button",
-      current_value: norm(el.innerText || el.value || el.textContent || "")
+      label_override: bestLabel(el) || buttonText,
+      current_value: buttonText
     });
   }
 
   for (const el of Array.from(document.querySelectorAll("[role='combobox'],[role='listbox']"))) {
     if (!visible(el)) continue;
     const role = el.getAttribute("role");
+    const isInput = el.tagName.toLowerCase() === "input";
+    let current = isInput ? el.value : "";
+    if (!current) {
+      const control = el.closest("[class*='control' i],[class*='select' i]") || el.parentElement;
+      const selected = control
+        ? control.querySelector("[class*='singleValue' i],[class*='selected' i],[class*='value' i]")
+        : null;
+      current = selected ? norm(selected.innerText || selected.textContent || "") : "";
+      if (!current && !isInput) current = norm(el.innerText || el.textContent || "");
+    }
     add(el, {
       element_type: role,
       input_type: role,
-      current_value: norm(el.innerText || el.textContent || ""),
-      confidence_notes: ["ARIA custom widget detected; automatic fill support is limited."]
+      current_value: current,
+      confidence_notes: [
+        "ARIA custom widget detected; options are read when the widget is opened during fill."
+      ]
     });
   }
 
