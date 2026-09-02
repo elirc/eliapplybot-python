@@ -89,22 +89,25 @@ eliapplybot import-profile output\my-profile.json
 eliapplybot export-profile output\profile.json
 eliapplybot add-job "https://example.com/job"
 eliapplybot list-jobs
+eliapplybot set-status 1 applied
 eliapplybot scan "https://example.com/job"
 eliapplybot run "https://example.com/job"
 eliapplybot show-attempt 1
 ```
 
-`scan` opens the page and produces review entries without filling fields. `run` fills only high-confidence fields. Both accept `--headless` and `--no-input` (mainly for testing against local fixture pages) and `--report <path>` for a JSON report.
+`scan` opens the page and produces review entries without filling fields. `run` fills only high-confidence fields. Both accept `--headless` and `--no-input` (mainly for testing against local fixture pages) and `--report <path>` for a JSON report. `set-status` tracks a job through saved, applied, interviewing, offer, rejected, or withdrawn.
 
 ## Optional local dashboard
-
-The dashboard is intentionally small in this first build:
 
 ```powershell
 uvicorn eliapplybot.web.app:app --reload
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:8000`. The dashboard lists your jobs (with an inline
+status dropdown for tracking), recent fill attempts with filled/uncertain/failed
+counts, and a per-attempt fill log showing what was filled and why. Values are
+masked before storage, so the fill log never contains your full email or phone
+number.
 
 ## Tests and linting
 

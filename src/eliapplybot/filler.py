@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from contextlib import suppress
 
 from playwright.sync_api import Page
@@ -7,6 +8,8 @@ from playwright.sync_api import Page
 from eliapplybot.matcher import is_decline, normalize_text
 from eliapplybot.models import Confidence, FieldMatch, FillAction, FillResult
 from eliapplybot.review import mask_value
+
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def fill_matches(page: Page, matches: list[FieldMatch]) -> list[FillResult]:
@@ -63,6 +66,12 @@ def fill_one(page: Page, match: FieldMatch) -> FillResult:
                 value_preview=value,
                 old_value=old_value,
                 reason="Unsafe or non-text control skipped.",
+            )
+        elif (field.input_type or "").lower() == "date" and not ISO_DATE.fullmatch(value):
+            return uncertain(
+                match,
+                old_value,
+                "Native date input needs a full YYYY-MM-DD value; fill manually.",
             )
         else:
             locator.fill(value, timeout=5000)

@@ -12,6 +12,16 @@ from eliapplybot.config import ensure_parent
 from eliapplybot.models import CandidateProfile, DetectedField, FillResult, JobRecord
 from eliapplybot.review import mask_value
 
+JOB_STATUSES = {
+    "new",
+    "saved",
+    "applied",
+    "interviewing",
+    "offer",
+    "rejected",
+    "withdrawn",
+}
+
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
@@ -170,6 +180,19 @@ class Storage:
             for row in rows
         ]
 
+    def update_job_status(self, job_id: int, status: str) -> None:
+        if status not in JOB_STATUSES:
+            raise ValueError(
+                f"Unknown status {status!r}. Choose from: {', '.join(sorted(JOB_STATUSES))}"
+            )
+        with self.transaction() as connection:
+            cursor = connection.execute(
+                "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
+                (status, utcnow(), job_id),
+            )
+            if cursor.rowcount == 0:
+                raise LookupError(f"No job with id {job_id}.")
+
     def create_attempt(self, job_id: int, adapter_name: str) -> int:
         now = utcnow()
         with self.transaction() as connection:
@@ -243,6 +266,35 @@ class Storage:
                 """,
                 rows,
             )
+
+    def list_attempts(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                  a.id, a.adapter_name, a.status, a.started_at, a.finished_at, j.url,
+                  SUM(CASE WHEN f.action_taken = 'filled' THEN 1 ELSE 0 END) AS filled_count,
+                  SUM(CASE WHEN f.action_taken = 'uncertain' THEN 1 ELSE 0 END)
+                    AS uncertain_count,
+                  SUM(CASE WHEN f.action_taken = 'failed' THEN 1 ELSE 0 END) AS failed_count
+                FROM application_attempts a
+                JOIN jobs j ON j.id = a.job_id
+                LEFT JOIN fill_logs f ON f.application_attempt_id = a.id
+                GROUP BY a.id
+                ORDER BY a.id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "filled_count": row["filled_count"] or 0,
+                "uncertain_count": row["uncertain_count"] or 0,
+                "failed_count": row["failed_count"] or 0,
+            }
+            for row in rows
+        ]
 
     def show_attempt(self, attempt_id: int) -> dict[str, Any]:
         with self.transaction() as connection:

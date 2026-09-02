@@ -43,3 +43,58 @@ def test_storage_closes_connections(tmp_path):
     storage.list_jobs()
     # On Windows this raises PermissionError if any connection is still open.
     db_path.unlink()
+
+
+def test_job_status_updates(tmp_path):
+    storage = Storage(tmp_path / "app.sqlite3")
+    storage.init_db()
+    job_id = storage.add_job("https://example.com/job")
+    storage.update_job_status(job_id, "applied")
+    assert storage.list_jobs()[0].status == "applied"
+
+    import pytest
+
+    with pytest.raises(ValueError):
+        storage.update_job_status(job_id, "bogus")
+    with pytest.raises(LookupError):
+        storage.update_job_status(999, "applied")
+
+
+def test_list_attempts_counts(tmp_path):
+    from eliapplybot.models import Confidence, FieldMatch, FillAction, FillResult
+
+    storage = Storage(tmp_path / "app.sqlite3")
+    storage.init_db()
+    job_id = storage.add_job("https://example.com/job")
+    attempt_id = storage.create_attempt(job_id, "generic")
+    field = DetectedField(
+        stable_id="field-1",
+        selector="#email",
+        element_type="input",
+        input_type="email",
+        label_text="Email address",
+    )
+    match = FieldMatch(
+        field=field,
+        detected_field_key="email address",
+        confidence=Confidence.HIGH,
+        value="x@example.com",
+        reason="test",
+    )
+    storage.save_fill_results(
+        attempt_id,
+        [
+            FillResult(match=match, action=FillAction.FILLED, reason="test"),
+            FillResult(match=match, action=FillAction.UNCERTAIN, reason="test"),
+        ],
+    )
+    attempts = storage.list_attempts()
+    assert len(attempts) == 1
+    assert attempts[0]["filled_count"] == 1
+    assert attempts[0]["uncertain_count"] == 1
+    assert attempts[0]["failed_count"] == 0
+
+    empty_attempt = storage.create_attempt(job_id, "generic")
+    attempts = storage.list_attempts()
+    assert attempts[0]["id"] == empty_attempt
+    assert attempts[0]["filled_count"] == 0

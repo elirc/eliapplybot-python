@@ -73,6 +73,8 @@ def test_fake_application_fill_end_to_end(browser, profile):
     assert values["authorized"] == "Yes"
     assert values["sponsorship"] == "No"
     assert values["education_school"] == "Example University"
+    assert values["edu_start_month"] == "September"
+    assert values["edu_start_year"] == "2018"
     assert values["python_years"] == "5"
     assert values["gender"] == "Decline to answer"
     assert values["veteran"] == "Decline to answer"
@@ -152,4 +154,29 @@ def test_submit_button_is_reported_but_never_clicked(browser, profile):
     assert all(m.confidence == Confidence.SKIP for m in buttons)
     assert any("final" in m.reason.lower() for m in buttons)
     assert page.evaluate("() => document.body.dataset.submitted") is None
+    page.close()
+
+
+def test_iframe_embedded_form_is_scanned_and_filled(browser, profile):
+    page = open_fixture(browser, "iframe_host.html")
+    page.wait_for_load_state("networkidle")
+    fields, matches, results = run_pipeline(page, profile)
+
+    frame_indexes = {f.frame_index for f in fields}
+    assert len(frame_indexes) == 2, "expected fields from the host page and the iframe"
+
+    child = page.frames[1]
+    child_values = child.evaluate(
+        "() => Object.fromEntries(Array.from("
+        "document.querySelectorAll('input,select,textarea'))"
+        ".filter(e => e.type !== 'radio' && e.type !== 'checkbox')"
+        ".map(e => [e.name, e.value]))"
+    )
+    assert child_values["first_name"] == "Eli"
+    assert child_values["email"] == "eli@example.com"
+    assert child_values["authorized"] == "Yes"
+    # Host-page field with no mapping stays untouched.
+    assert page.locator("#referrer").input_value() == ""
+    assert child.evaluate("() => document.body.dataset.submitted") is None
+    assert not [r for r in results if r.action == FillAction.FAILED]
     page.close()

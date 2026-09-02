@@ -15,20 +15,27 @@ This first build demonstrates the full local architecture, but it is intentional
   as failed if the page shows a different value.
 - `new-profile` template command, `--no-input` automation flag, and
   resume/cover-letter path existence warnings on import.
+- Separate month/year date controls: month selects get month names, year
+  selects get years, `type=month` inputs get `YYYY-MM`, and native `type=date`
+  inputs are left for review (a full date is not stored). GPA fields match.
+- Application tracking statuses via `set-status` (saved, applied, interviewing,
+  offer, rejected, withdrawn), also editable from the dashboard.
+- Dashboard attempts view with per-attempt fill logs and status dropdowns,
+  covered by FastAPI TestClient tests.
+- Same-origin iframe scan/fill covered by a browser integration test.
+- Friendly CLI error messages instead of tracebacks for missing profiles,
+  attempts, files, and invalid JSON.
 
 ## Next practical improvements
 
-- Improve same-origin iframe selector stability and cross-frame reporting.
 - Add richer adapter-specific scanner hints for Greenhouse, Lever, Ashby, and Workday.
 - Extend custom widget support to Workday-style multi-step controls.
 - Add an explicit review UI where each medium-confidence suggestion can be approved before filling.
 - Add resume upload approval flow with file existence checks and clear confirmation.
 - Add answer-bank search/edit UI and manual “fill this answer” controls.
-- Add application tracking statuses: saved, applied, rejected, interviewing, offer, withdrawn.
 - Add per-job notes and reusable final checklist templates.
 - Add multi-profile support in the dashboard.
 - Add a job queue with respectful pacing and no background mass-submit behavior.
-- Add richer date handling for separate month/year controls and browser-native date/month inputs.
 - Add better grouping for checkbox groups where multiple selections are appropriate.
 - Add import helpers from the original extension profile shape if needed.
 

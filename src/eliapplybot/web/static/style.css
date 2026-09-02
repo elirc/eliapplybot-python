@@ -41,3 +41,8 @@ code {
   background: #e9edf3;
 }
 
+
+.url-cell { word-break: break-all; max-width: 420px; }
+tr.action-failed td { background: #fdd; }
+tr.action-uncertain td { background: #ffd; }
+select { padding: 4px; }

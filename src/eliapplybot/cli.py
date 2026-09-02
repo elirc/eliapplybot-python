@@ -3,7 +3,10 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import sys
 from pathlib import Path
+
+from pydantic import ValidationError
 
 from eliapplybot.config import AppConfig
 from eliapplybot.profile_io import load_profile, profile_template, save_profile
@@ -38,6 +41,12 @@ def main() -> None:
 
     sub.add_parser("list-jobs")
 
+    set_status = sub.add_parser(
+        "set-status", help="Track a job: saved, applied, interviewing, offer, rejected, withdrawn."
+    )
+    set_status.add_argument("job_id", type=int)
+    set_status.add_argument("status")
+
     show_attempt = sub.add_parser("show-attempt")
     show_attempt.add_argument("id", type=int)
 
@@ -69,6 +78,21 @@ def main() -> None:
     storage = Storage(config.db_path)
     storage.init_db()
 
+    try:
+        dispatch(args, config, storage)
+    except ValidationError as exc:
+        print("Error: the profile JSON is invalid:", file=sys.stderr)
+        for error in exc.errors():
+            location = ".".join(str(part) for part in error["loc"])
+            print(f"  {location}: {error['msg']}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Error: the file is not valid JSON ({exc}).") from exc
+    except (LookupError, ValueError, FileNotFoundError) as exc:
+        raise SystemExit(f"Error: {exc}") from exc
+
+
+def dispatch(args: argparse.Namespace, config: AppConfig, storage: Storage) -> None:
     if args.command == "init-db":
         print(f"Initialized database at {config.db_path}")
     elif args.command == "new-profile":
@@ -98,7 +122,11 @@ def main() -> None:
         print(f"Job id {job_id}: {args.url}")
     elif args.command == "list-jobs":
         for job in storage.list_jobs():
-            print(f"{job.id}\t{job.status}\t{job.url}")
+            title = f"  ({job.title})" if job.title else ""
+            print(f"{job.id}\t{job.status}\t{job.url}{title}")
+    elif args.command == "set-status":
+        storage.update_job_status(args.job_id, args.status)
+        print(f"Job {args.job_id} status set to {args.status}")
     elif args.command == "show-attempt":
         data = storage.show_attempt(args.id)
         print(json.dumps(data, indent=2))

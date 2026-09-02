@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Attempt {{ attempt.id }} - eliapplybot</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Attempt {{ attempt.id }}</h1>
+        <p><a href="/">&larr; Back to dashboard</a></p>
+      </header>
+      <section>
+        <h2>Summary</h2>
+        <table>
+          <tbody>
+            <tr><th>Job URL</th><td class="url-cell">{{ attempt.url }}</td></tr>
+            <tr><th>Adapter</th><td>{{ attempt.adapter_name }}</td></tr>
+            <tr><th>Status</th><td>{{ attempt.status }}</td></tr>
+            <tr><th>Started</th><td>{{ attempt.started_at }}</td></tr>
+            <tr><th>Finished</th><td>{{ attempt.finished_at or "" }}</td></tr>
+            <tr><th>Detected fields</th><td>{{ fields | length }}</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Fill log</h2>
+        {% if logs %}
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th><th>Type</th><th>Action</th><th>Confidence</th>
+                <th>Value preview</th><th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+                <tr class="action-{{ log.action_taken }}">
+                  <td>{{ log.field_label }}</td>
+                  <td>{{ log.field_type }}</td>
+                  <td>{{ log.action_taken }}</td>
+                  <td>{{ log.confidence }}</td>
+                  <td>{{ log.value_preview or "" }}</td>
+                  <td>{{ log.reason }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>No fill log entries for this attempt.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

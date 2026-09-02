@@ -21,14 +21,23 @@
         {% if jobs %}
           <table>
             <thead>
-              <tr><th>ID</th><th>Status</th><th>URL</th></tr>
+              <tr><th>ID</th><th>Status</th><th>Title</th><th>URL</th></tr>
             </thead>
             <tbody>
               {% for job in jobs %}
                 <tr>
                   <td>{{ job.id }}</td>
-                  <td>{{ job.status }}</td>
-                  <td>{{ job.url }}</td>
+                  <td>
+                    <form method="post" action="/jobs/{{ job.id }}/status">
+                      <select name="status" onchange="this.form.submit()">
+                        {% for status in statuses %}
+                          <option value="{{ status }}" {% if status == job.status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
+                      </select>
+                    </form>
+                  </td>
+                  <td>{{ job.title or "" }}</td>
+                  <td><a href="{{ job.url }}" rel="noopener">{{ job.url }}</a></td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -37,7 +46,34 @@
           <p>No jobs added yet.</p>
         {% endif %}
       </section>
+      <section>
+        <h2>Recent attempts</h2>
+        {% if attempts %}
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Started</th><th>Status</th><th>Filled</th>
+                <th>Uncertain</th><th>Failed</th><th>Job</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+                <tr>
+                  <td><a href="/attempts/{{ attempt.id }}">{{ attempt.id }}</a></td>
+                  <td>{{ attempt.started_at[:16] }}</td>
+                  <td>{{ attempt.status }}</td>
+                  <td>{{ attempt.filled_count }}</td>
+                  <td>{{ attempt.uncertain_count }}</td>
+                  <td>{{ attempt.failed_count }}</td>
+                  <td class="url-cell">{{ attempt.url }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>No attempts recorded yet. Run <code>eliapplybot run &lt;url&gt;</code> to create one.</p>
+        {% endif %}
+      </section>
     </main>
   </body>
 </html>
-

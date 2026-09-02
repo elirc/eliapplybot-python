@@ -22,6 +22,20 @@ DECLINE_PATTERNS = re.compile(
     re.I,
 )
 CUSTOM_WIDGETS = {"combobox", "listbox"}
+MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]
 
 # Labels that contain a personal keyword but usually mean a different sub-field.
 AMBIGUOUS_PERSONAL: dict[str, re.Pattern[str]] = {
@@ -326,19 +340,29 @@ def match_education(
         return high(
             "education.0.field_of_study", edu.field_of_study, "Matched education field of study."
         )
+    if re.search(r"\b(gpa|grade point)\b", haystack) and edu.gpa:
+        return high("education.0.gpa", edu.gpa, "Matched education GPA field.")
     if re.search(r"\b(start|from)\b", haystack) and re.search(r"\b(date|month|year)\b", haystack):
-        return high(
+        return date_part_match(
+            _field,
+            haystack,
             "education.0.start",
-            format_month_year(edu.start_month, edu.start_year),
-            "Matched education start date.",
+            edu.start_month,
+            edu.start_year,
+            False,
+            "education start date",
         )
     if re.search(r"\b(end|to|graduation|graduate)\b", haystack) and re.search(
         r"\b(date|month|year)\b", haystack
     ):
-        return high(
+        return date_part_match(
+            _field,
+            haystack,
             "education.0.end",
-            "Present" if edu.current else format_month_year(edu.end_month, edu.end_year),
-            "Matched education end date.",
+            edu.end_month,
+            edu.end_year,
+            edu.current,
+            "education end date",
         )
     return None
 
@@ -361,16 +385,24 @@ def match_experience(
             "experience.0.location", exp.location, "Matched work experience location field."
         )
     if re.search(r"\b(start|from)\b", haystack) and re.search(r"\b(date|month|year)\b", haystack):
-        return high(
+        return date_part_match(
+            _field,
+            haystack,
             "experience.0.start",
-            format_month_year(exp.start_month, exp.start_year),
-            "Matched work experience start date.",
+            exp.start_month,
+            exp.start_year,
+            False,
+            "work experience start date",
         )
     if re.search(r"\b(end|to)\b", haystack) and re.search(r"\b(date|month|year)\b", haystack):
-        return high(
+        return date_part_match(
+            _field,
+            haystack,
             "experience.0.end",
-            "Present" if exp.current else format_month_year(exp.end_month, exp.end_year),
-            "Matched work experience end date.",
+            exp.end_month,
+            exp.end_year,
+            exp.current,
+            "work experience end date",
         )
     return None
 
@@ -402,6 +434,69 @@ def match_preferences(
             }
         return medium("preferences.salary_expectation", "Salary field found; no configured value.")
     return None
+
+
+def date_part_match(
+    field: DetectedField,
+    haystack: str,
+    key_prefix: str,
+    month: int | None,
+    year: int | None,
+    current: bool,
+    label: str,
+) -> dict[str, object] | None:
+    """Match start/end date fields, including separate month/year controls."""
+    wants_month = bool(re.search(r"\bmonth\b", haystack))
+    wants_year = bool(re.search(r"\byear\b", haystack))
+    if current:
+        return medium(
+            key_prefix,
+            f"{label} is marked current; pick the appropriate option or leave blank.",
+        )
+    if wants_month and not wants_year:
+        value = month_field_value(field, month)
+        if value:
+            return high(f"{key_prefix}_month", value, f"Matched {label} month field.")
+        return medium(f"{key_prefix}_month", f"{label} month field found, but no safe value.")
+    if wants_year and not wants_month:
+        value = year_field_value(field, year)
+        if value:
+            return high(f"{key_prefix}_year", value, f"Matched {label} year field.")
+        return medium(f"{key_prefix}_year", f"{label} year field found, but no safe value.")
+    if (field.input_type or "").lower() == "month":
+        if month and year:
+            return high(key_prefix, f"{year}-{month:02d}", f"Matched {label} month input.")
+        return medium(key_prefix, f"{label} month input found, but the saved date is incomplete.")
+    if (field.input_type or "").lower() == "date":
+        return medium(
+            key_prefix,
+            f"{label} needs a full date including day; only month/year are saved. Review.",
+        )
+    return high(key_prefix, format_month_year(month, year), f"Matched {label}.")
+
+
+def month_field_value(field: DetectedField, month: int | None) -> str | None:
+    if not month:
+        return None
+    name = MONTH_NAMES[month - 1]
+    if field.options:
+        return (
+            resolve_option(field, name)
+            or resolve_option(field, name[:3])
+            or resolve_option(field, f"{month:02d}")
+            or resolve_option(field, str(month))
+        )
+    if (field.input_type or "").lower() == "number":
+        return str(month)
+    return name
+
+
+def year_field_value(field: DetectedField, year: int | None) -> str | None:
+    if not year:
+        return None
+    if field.options:
+        return resolve_option(field, str(year))
+    return str(year)
 
 
 def high(key: str, value: str, reason: str) -> dict[str, object]:

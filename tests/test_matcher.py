@@ -266,3 +266,86 @@ def test_remote_preference_is_suggested_not_filled():
     assert match.mapped_profile_key == "preferences.remote_preference"
     assert match.confidence == Confidence.MEDIUM
     assert match.value == "Remote or hybrid"
+
+
+def test_separate_month_and_year_selects_get_month_name_and_year():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+    month = match_field(
+        labeled_field(
+            "Start month",
+            "Education Start month Start year",
+            element_type="select",
+            input_type="select-one",
+            options=months,
+        ),
+        profile,
+    )
+    assert month.mapped_profile_key == "education.0.start_month"
+    assert month.value == "September"
+    assert month.confidence == Confidence.HIGH
+
+    year = match_field(
+        labeled_field(
+            "Start year",
+            "Education Start month Start year",
+            element_type="select",
+            input_type="select-one",
+            options=[str(y) for y in range(2014, 2027)],
+        ),
+        profile,
+    )
+    assert year.mapped_profile_key == "education.0.start_year"
+    assert year.value == "2018"
+
+
+def test_native_date_input_is_review_only():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    date_input = match_field(
+        labeled_field("Start date", "Education Start date", input_type="date"),
+        profile,
+    )
+    assert date_input.confidence == Confidence.MEDIUM
+
+    month_input = match_field(
+        labeled_field("Start date", "Education Start date", input_type="month"),
+        profile,
+    )
+    assert month_input.confidence == Confidence.HIGH
+    assert month_input.value == "2018-09"
+
+
+def test_current_role_end_date_is_review_only():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    end = match_field(
+        labeled_field(
+            "End month",
+            "Experience Employer End month",
+            element_type="select",
+            input_type="select-one",
+            options=["January", "December"],
+        ),
+        profile,
+    )
+    assert end.confidence == Confidence.MEDIUM
+    assert end.value is None
+
+
+def test_gpa_matches_education_entry():
+    profile = load_profile(FIXTURES / "sample_profile.json")
+    gpa = match_field(labeled_field("GPA", "Education GPA"), profile)
+    assert gpa.mapped_profile_key == "education.0.gpa"
+    assert gpa.value == "3.8"
