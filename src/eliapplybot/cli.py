@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from eliapplybot.config import AppConfig
 from eliapplybot.profile_io import load_profile, profile_template, save_profile
 from eliapplybot.storage import Storage
+from eliapplybot.transcribe import TranscriptionError, slugify, transcribe_file
 from eliapplybot.workflow import run_application, scan_application
 
 
@@ -69,6 +70,21 @@ def main() -> None:
     scan.add_argument("--headless", action="store_true")
     scan.add_argument("--no-input", action="store_true")
 
+    transcribe = sub.add_parser(
+        "transcribe",
+        help=(
+            "Transcribe an audio file with Groq Whisper and optionally save it "
+            "to the answer bank (requires GROQ_API_KEY)."
+        ),
+    )
+    transcribe.add_argument("audio_path")
+    transcribe.add_argument("--save-answer", metavar="TITLE", help="Save as answer-bank entry.")
+    transcribe.add_argument("--answer-id", help="Answer id (defaults to a slug of the title).")
+    transcribe.add_argument("--category", default="dictated")
+    transcribe.add_argument("--tags", default="", help="Comma-separated tags.")
+    transcribe.add_argument("--profile", default="default")
+    transcribe.add_argument("--language", help="ISO language code hint, e.g. en.")
+
     args = parser.parse_args()
     config = AppConfig.from_env()
     if args.db:
@@ -88,7 +104,7 @@ def main() -> None:
         raise SystemExit(1) from exc
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Error: the file is not valid JSON ({exc}).") from exc
-    except (LookupError, ValueError, FileNotFoundError) as exc:
+    except (LookupError, ValueError, FileNotFoundError, TranscriptionError) as exc:
         raise SystemExit(f"Error: {exc}") from exc
 
 
@@ -127,6 +143,24 @@ def dispatch(args: argparse.Namespace, config: AppConfig, storage: Storage) -> N
     elif args.command == "set-status":
         storage.update_job_status(args.job_id, args.status)
         print(f"Job {args.job_id} status set to {args.status}")
+    elif args.command == "transcribe":
+        text = transcribe_file(args.audio_path, language=args.language)
+        print(text)
+        if args.save_answer:
+            from datetime import date
+
+            from eliapplybot.models import AnswerBankEntry
+
+            entry = AnswerBankEntry(
+                id=args.answer_id or slugify(args.save_answer),
+                title=args.save_answer,
+                category=args.category,
+                tags=[tag.strip() for tag in args.tags.split(",") if tag.strip()],
+                answer=text,
+                last_updated=date.today(),
+            )
+            storage.append_answer(entry, profile_name=args.profile)
+            print(f"Saved to answer bank as {entry.id!r} in profile {args.profile!r}.")
     elif args.command == "show-attempt":
         data = storage.show_attempt(args.id)
         print(json.dumps(data, indent=2))

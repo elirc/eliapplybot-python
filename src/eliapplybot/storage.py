@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from eliapplybot.config import ensure_parent
-from eliapplybot.models import CandidateProfile, DetectedField, FillResult, JobRecord
+from eliapplybot.models import (
+    AnswerBankEntry,
+    CandidateProfile,
+    DetectedField,
+    FillResult,
+    JobRecord,
+)
 from eliapplybot.review import mask_value
 
 JOB_STATUSES = {
@@ -147,6 +153,15 @@ class Storage:
         if not row:
             raise LookupError(f"No profile named {name!r}. Import one first.")
         return CandidateProfile.model_validate_json(row["profile_json"])
+
+    def append_answer(self, entry: AnswerBankEntry, profile_name: str = "default") -> None:
+        """Add an answer-bank entry to the stored profile, replacing any same-id entry."""
+        profile = self.load_profile(profile_name)
+        profile.answer_bank = [
+            existing for existing in profile.answer_bank if existing.id != entry.id
+        ]
+        profile.answer_bank.append(entry)
+        self.save_profile(profile, name=profile_name)
 
     def add_job(self, url: str, title: str | None = None, company: str | None = None) -> int:
         now = utcnow()

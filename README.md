@@ -7,7 +7,9 @@ This app opens job application pages in a Playwright-controlled Chromium browser
 ## Safety model
 
 - Local SQLite storage only.
-- No cloud backend, remote database, or AI API dependency.
+- No cloud backend or remote database. The only network feature is optional
+  voice dictation, which sends just your recorded audio to the Groq Whisper
+  API when you use it (off unless you set `GROQ_API_KEY`).
 - Manual login is supported through the visible browser.
 - CAPTCHAs, bot checks, rate limits, paywalls, and login restrictions are not bypassed.
 - Final buttons such as submit, apply, send, finish, and complete are detected but never clicked.
@@ -93,6 +95,7 @@ eliapplybot set-status 1 applied
 eliapplybot scan "https://example.com/job"
 eliapplybot run "https://example.com/job"
 eliapplybot show-attempt 1
+eliapplybot transcribe recording.m4a --save-answer "Greatest strengths"
 ```
 
 `scan` opens the page and produces review entries without filling fields. `run` fills only high-confidence fields. Both accept `--headless` and `--no-input` (mainly for testing against local fixture pages) and `--report <path>` for a JSON report. `set-status` tracks a job through saved, applied, interviewing, offer, rejected, or withdrawn.
@@ -108,6 +111,32 @@ status dropdown for tracking), recent fill attempts with filled/uncertain/failed
 counts, and a per-attempt fill log showing what was filled and why. Values are
 masked before storage, so the fill log never contains your full email or phone
 number.
+
+## Optional voice dictation (Groq Whisper)
+
+Long-form answers are suggested from your local answer bank — and you can
+build that answer bank by voice. This is the only feature that talks to a
+remote service: the audio you explicitly record or transcribe is sent to the
+Groq API (`whisper-large-v3-turbo` — accurate on technical vocabulary, faster
+than real time, 7,200 free audio-seconds per hour, no card required). Nothing
+else ever leaves your machine, and the feature is entirely off until you set a
+key.
+
+Setup: create a free key at `https://console.groq.com` and add
+`GROQ_API_KEY=...` to your `.env` file (see `.env.example`;
+`ELIAPPLYBOT_STT_MODEL` overrides the model).
+
+From the dashboard: open `http://127.0.0.1:8000/dictate`, record your answer
+in the browser, review/edit the transcript, and save it to the answer bank
+with tags. Saved answers are then suggested automatically when a matching
+long-form question appears on an application.
+
+From the CLI:
+
+```powershell
+eliapplybot transcribe recording.m4a
+eliapplybot transcribe recording.m4a --save-answer "Greatest strengths" --tags "strengths, about"
+```
 
 ## Tests and linting
 

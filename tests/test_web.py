@@ -77,3 +77,44 @@ def test_job_status_update_roundtrip(client):
     assert "applied" in response.text
     assert client.post("/jobs/1/status", data={"status": "bogus"}).status_code == 400
     assert client.post("/jobs/999/status", data={"status": "applied"}).status_code == 404
+
+
+def test_dictate_page_renders_answer_bank(client):
+    response = client.get("/dictate")
+    assert response.status_code == 200
+    assert "Why this role" in response.text  # from the sample profile answer bank
+
+
+def test_api_transcribe_uses_groq_and_returns_text(client, monkeypatch):
+    import eliapplybot.web.app as web_app
+
+    monkeypatch.setattr(web_app, "transcribe_audio", lambda data, filename: "Dictated answer text.")
+    response = client.post(
+        "/api/transcribe", files={"file": ("clip.webm", b"fake-audio", "audio/webm")}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"text": "Dictated answer text."}
+
+
+def test_api_transcribe_reports_errors(client, monkeypatch):
+    import eliapplybot.web.app as web_app
+    from eliapplybot.transcribe import TranscriptionError
+
+    def boom(data, filename):
+        raise TranscriptionError("GROQ_API_KEY is not set.")
+
+    monkeypatch.setattr(web_app, "transcribe_audio", boom)
+    response = client.post("/api/transcribe", files={"file": ("clip.webm", b"x", "audio/webm")})
+    assert response.status_code == 400
+    assert "GROQ_API_KEY" in response.json()["detail"]
+
+
+def test_save_answer_roundtrip(client):
+    response = client.post(
+        "/answers",
+        data={"title": "My Strengths", "answer": "Persistence.", "tags": "strengths, about"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "my-strengths" in response.text
+    assert "Persistence." in response.text

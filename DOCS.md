@@ -20,7 +20,9 @@ left unclicked.
 
 ### Safety model
 
-- All data stays local: SQLite storage, no cloud backend, no AI API calls.
+- All data stays local: SQLite storage, no cloud backend. The one optional
+  network feature is voice dictation, which sends only your recorded audio to
+  the Groq Whisper API, and only when you use it.
 - Manual login through the visible browser; CAPTCHAs, bot checks, and login
   restrictions are never bypassed.
 - Submit/apply/send buttons are never clicked.
@@ -93,11 +95,23 @@ uvicorn eliapplybot.web.app:app --reload   # http://127.0.0.1:8000
 
 Shows jobs with inline status dropdowns, recent attempts with
 filled/uncertain/failed counts, and a per-attempt fill log (masked values).
+The `/dictate` page records audio in the browser and saves the transcript to
+your answer bank.
+
+### Voice dictation (optional)
+
+Set `GROQ_API_KEY` in `.env` (free key, no card: `https://console.groq.com`)
+to enable speech-to-text via Groq's `whisper-large-v3-turbo`. Dictate answers
+on the dashboard's `/dictate` page or with
+`eliapplybot transcribe clip.m4a --save-answer "Title" --tags "why, role"`.
+Saved answers are suggested automatically when a matching long-form question
+appears on an application form. Only the audio you transcribe is sent to
+Groq.
 
 ### Tests
 
 ```powershell
-pytest          # 35 tests: unit + headless-Chromium integration + web routes
+pytest          # 48 tests: unit + headless-Chromium integration + web routes
 ruff check .
 ```
 
@@ -121,7 +135,8 @@ dashboard around it:
 | `review.py` | Terminal + JSON report with masking, missing-required detection, final-button listing, and a manual checklist. |
 | `storage.py` | SQLite: profiles, jobs (with tracking statuses), attempts, field detections, fill logs. |
 | `adapters/` | Per-ATS metadata (Greenhouse, Lever, Ashby, Workday, generic): URL matching, quirks, warnings. |
-| `web/` | FastAPI dashboard: jobs + status updates, attempts list, fill-log detail. |
+| `web/` | FastAPI dashboard: jobs + status updates, attempts list, fill-log detail, browser dictation page. |
+| `transcribe.py` | Optional Groq Whisper client for dictating answer-bank entries (opt-in via `GROQ_API_KEY`). |
 
 Data model (`models.py`): pydantic `CandidateProfile` (contact, authorization,
 EEO, education, experience, skills, documents, answer bank, preferences),
@@ -194,6 +209,24 @@ Focus: the untested parts of the app plus top roadmap items.
 - **Tests 24 → 35** — web-route tests (including the masking guarantee),
   storage status/count tests, matcher date/GPA tests, iframe browser test,
   month/year selects added to the main fixture.
+
+### `v1.0.0` — Voice dictation for the answer bank (Groq Whisper)
+
+- New `transcribe.py` module calling Groq's `whisper-large-v3-turbo`
+  (OpenAI-compatible endpoint) with clear errors for a missing key, oversized
+  audio (25 MB free-tier limit), unsupported formats, and network failures.
+- CLI `transcribe <audio>` prints the transcript;
+  `--save-answer "Title" --tags ...` stores it in the profile's answer bank
+  (same-id entries are replaced).
+- Dashboard `/dictate` page: record in the browser (MediaRecorder), transcribe
+  through the local server, edit, and save with tags; shows the current answer
+  bank and a setup notice when no key is configured.
+- Saved answers flow into the existing matcher suggestion path for long-form
+  questions.
+- `httpx` promoted to a runtime dependency; `GROQ_API_KEY` /
+  `ELIAPPLYBOT_STT_MODEL` documented in `.env.example`.
+- Tests 35 -> 48, all Groq calls mocked (no network or key needed in CI).
+- Version bumped to 1.0.0.
 
 ### Known limitations (current)
 

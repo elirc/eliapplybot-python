@@ -46,3 +46,10 @@ code {
 tr.action-failed td { background: #fdd; }
 tr.action-uncertain td { background: #ffd; }
 select { padding: 4px; }
+
+.notice { background: #fff3cd; border: 1px solid #ffe08a; padding: 10px 14px; }
+.saved { color: #1a7f37; }
+form label { display: block; margin-top: 10px; }
+form input, form textarea { width: 100%; padding: 6px; margin-top: 2px; }
+form button { margin-top: 12px; padding: 8px 14px; }
+#record-btn { padding: 8px 14px; }

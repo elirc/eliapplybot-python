@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dictate - eliapplybot</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Dictate an answer</h1>
+        <p><a href="/">&larr; Back to dashboard</a></p>
+        <p>
+          Record your answer, transcribe it with Groq Whisper, edit the text, and save it to your
+          answer bank. Only the audio you record here is sent to Groq; everything else stays local.
+        </p>
+      </header>
+
+      {% if not has_api_key %}
+        <section class="notice">
+          <strong>GROQ_API_KEY is not set.</strong>
+          Create a free key at <code>https://console.groq.com</code> (no card needed) and add
+          <code>GROQ_API_KEY=...</code> to your <code>.env</code> file, then restart the dashboard.
+        </section>
+      {% endif %}
+
+      <section>
+        <h2>1. Record</h2>
+        <button id="record-btn" type="button" {% if not has_api_key %}disabled{% endif %}>
+          Start recording
+        </button>
+        <span id="record-status"></span>
+      </section>
+
+      <section>
+        <h2>2. Review and save</h2>
+        <form method="post" action="/answers">
+          <label for="title">Title</label>
+          <input id="title" name="title" required placeholder="Why this role">
+
+          <label for="answer">Transcript (edit before saving)</label>
+          <textarea id="answer" name="answer" rows="8" required
+                    placeholder="Your transcript will appear here..."></textarea>
+
+          <label for="tags">Tags (comma-separated, used to match questions)</label>
+          <input id="tags" name="tags" placeholder="why, role, company">
+
+          <button type="submit">Save to answer bank</button>
+        </form>
+        {% if saved %}<p class="saved">Saved answer {{ saved }}.</p>{% endif %}
+      </section>
+
+      <section>
+        <h2>Answer bank ({{ profile_name }})</h2>
+        {% if answers %}
+          <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Tags</th><th>Answer</th></tr></thead>
+            <tbody>
+              {% for entry in answers %}
+                <tr>
+                  <td>{{ entry.id }}</td>
+                  <td>{{ entry.title }}</td>
+                  <td>{{ entry.tags | join(", ") }}</td>
+                  <td class="url-cell">{{ entry.answer[:160] }}{% if entry.answer | length > 160 %}&hellip;{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>No answers saved yet.</p>
+        {% endif %}
+      </section>
+    </main>
+    <script>
+      const btn = document.getElementById("record-btn");
+      const status = document.getElementById("record-status");
+      const answerBox = document.getElementById("answer");
+      let recorder = null;
+      let chunks = [];
+
+      async function transcribe(blob) {
+        status.textContent = "Transcribing...";
+        const form = new FormData();
+        form.append("file", blob, "dictation.webm");
+        try {
+          const response = await fetch("/api/transcribe", { method: "POST", body: form });
+          const payload = await response.json();
+          if (!response.ok) {
+            status.textContent = "Error: " + (payload.detail || response.statusText);
+            return;
+          }
+          answerBox.value = answerBox.value
+            ? answerBox.value.trimEnd() + "\n" + payload.text
+            : payload.text;
+          status.textContent = "Transcribed. Edit the text, then save.";
+        } catch (error) {
+          status.textContent = "Error: " + error;
+        }
+      }
+
+      btn.addEventListener("click", async () => {
+        if (recorder && recorder.state === "recording") {
+          recorder.stop();
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          chunks = [];
+          recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+          recorder.addEventListener("dataavailable", (event) => chunks.push(event.data));
+          recorder.addEventListener("stop", () => {
+            stream.getTracks().forEach((track) => track.stop());
+            btn.textContent = "Start recording";
+            transcribe(new Blob(chunks, { type: "audio/webm" }));
+          });
+          recorder.start();
+          btn.textContent = "Stop recording";
+          status.textContent = "Recording... click again to stop.";
+        } catch (error) {
+          status.textContent = "Microphone unavailable: " + error;
+        }
+      });
+    </script>
+  </body>
+</html>

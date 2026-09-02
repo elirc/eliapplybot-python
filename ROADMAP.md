@@ -23,6 +23,8 @@ This first build demonstrates the full local architecture, but it is intentional
 - Dashboard attempts view with per-attempt fill logs and status dropdowns,
   covered by FastAPI TestClient tests.
 - Same-origin iframe scan/fill covered by a browser integration test.
+- Voice dictation for the answer bank via Groq Whisper (CLI `transcribe` and a
+  dashboard record-and-save page); opt-in via `GROQ_API_KEY`.
 - Friendly CLI error messages instead of tracebacks for missing profiles,
   attempts, files, and invalid JSON.
 
@@ -32,7 +34,6 @@ This first build demonstrates the full local architecture, but it is intentional
 - Extend custom widget support to Workday-style multi-step controls.
 - Add an explicit review UI where each medium-confidence suggestion can be approved before filling.
 - Add resume upload approval flow with file existence checks and clear confirmation.
-- Add answer-bank search/edit UI and manual “fill this answer” controls.
 - Add per-job notes and reusable final checklist templates.
 - Add multi-profile support in the dashboard.
 - Add a job queue with respectful pacing and no background mass-submit behavior.

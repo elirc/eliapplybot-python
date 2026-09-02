@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import os
+from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from eliapplybot.config import AppConfig
+from eliapplybot.models import AnswerBankEntry
 from eliapplybot.storage import JOB_STATUSES, Storage
+from eliapplybot.transcribe import TranscriptionError, slugify, transcribe_audio
 
 WEB_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
@@ -56,6 +60,60 @@ def attempt_detail(request: Request, attempt_id: int) -> HTMLResponse:
             "logs": data["logs"],
         },
     )
+
+
+@app.get("/dictate", response_class=HTMLResponse)
+def dictate(request: Request, saved: str | None = None) -> HTMLResponse:
+    storage = get_storage()
+    try:
+        answers = storage.load_profile().answer_bank
+    except LookupError:
+        answers = []
+    return templates.TemplateResponse(
+        request,
+        "dictate.html",
+        {
+            "answers": answers,
+            "profile_name": "default",
+            "has_api_key": bool(os.getenv("GROQ_API_KEY")),
+            "saved": saved,
+        },
+    )
+
+
+@app.post("/api/transcribe")
+async def api_transcribe(file: UploadFile) -> dict[str, str]:
+    data = await file.read()
+    try:
+        text = transcribe_audio(data, file.filename or "dictation.webm")
+    except TranscriptionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"text": text}
+
+
+@app.post("/answers")
+def save_answer(
+    title: str = Form(...),
+    answer: str = Form(...),
+    tags: str = Form(""),
+) -> RedirectResponse:
+    storage = get_storage()
+    entry = AnswerBankEntry(
+        id=slugify(title),
+        title=title.strip(),
+        category="dictated",
+        tags=[tag.strip() for tag in tags.split(",") if tag.strip()],
+        answer=answer.strip(),
+        last_updated=date.today(),
+    )
+    try:
+        storage.append_answer(entry)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{exc} Import a profile with the CLI before saving answers.",
+        ) from exc
+    return RedirectResponse(url=f"/dictate?saved={entry.id}", status_code=303)
 
 
 @app.post("/jobs/{job_id}/status")
