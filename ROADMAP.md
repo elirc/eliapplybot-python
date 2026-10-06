@@ -2,6 +2,20 @@
 
 This first build demonstrates the full local architecture, but it is intentionally conservative.
 
+> **Status note (2026-10-06, v1.0.0 @ `a4ad16c`):** Every item under "Done since
+> the first build" was checked against the code and is present. Every item
+> under "Next practical improvements" is still open. In particular:
+> - Adapters still only match hostnames. `normalize_field` is the identity in
+>   every adapter (`src/eliapplybot/adapters/base.py:27-28`).
+> - The dashboard saves dictated answers only to the `default` profile
+>   (`web/app.py:94-116`).
+> - A `review_notes` table exists (`storage.py:88`), but no code reads or
+>   writes it.
+>
+> DOCS.md section 5 lists defects found during this check (overwriting
+> pre-filled fields, skill-order matching, the unmasked scan snapshot, and
+> substring host matching). DOCS.md section 6 turns each one into an exercise.
+
 ## Done since the first build
 
 - Playwright browser integration tests for the fake application and custom
@@ -46,6 +60,7 @@ This first build demonstrates the full local architecture, but it is intentional
 - The first build does not automatically upload resume or cover letter files.
 - The first build does not click next/continue/final submit buttons.
 - Long-form answers are only suggested; they are not silently filled.
-- The local web dashboard is read-oriented; the CLI is the main workflow.
+- The CLI is the main workflow. The dashboard can change a job's status and
+  save dictated answers, but it cannot import profiles or start runs.
 - Browser tests skip automatically when Chromium is not installed.
 
